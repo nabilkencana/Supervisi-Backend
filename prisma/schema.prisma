@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  TEACHER
+}
+
+enum SupervisionType {
+  OFFLINE
+  ONLINE
+  HYBRID
+}
+
+enum SupervisionStatus {
+  PENDING
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum ScheduleType {
+  CLASS_OBSERVATION
+  MEETING
+  WORKSHOP
+  EVALUATION
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum ReportStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          Role
+  phone         String?
+  profileImage  String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  supervisor    Supervisor?
+  teacher       Teacher?
+  refreshTokens RefreshToken[]
+  auditLogs    AuditLog[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model RefreshToken {
+  id           String   @id @default(uuid())
+  token        String   @unique
+  userId       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Supervisor {
+  id              String       @id @default(uuid())
+  userId          String       @unique
+  nip             String       @unique
+  specialization  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  user            User         @relation(fields: [userId], references: [id])
+  assignedTeachers Teacher[]    @relation("SupervisorToTeacher")
+  supervisions    Supervision[]
+  schedules       Schedule[]
+  reports         Report[]
+
+  @@map("supervisors")
+}
+
+model Teacher {
+  id              String       @id @default(uuid())
+  userId          String       @unique
+  nip             String       @unique
+  subject         String
+  classroom       String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  user            User         @relation(fields: [userId], references: [id])
+  assignedSupervisors Supervisor[] @relation("SupervisorToTeacher")
+  supervisions    Supervision[]
+  assessments     Assessment[]
+  schedules       Schedule[]
+
+  @@map("teachers")
+}
+
+model Supervision {
+  id            String           @id @default(uuid())
+  supervisorId  String
+  teacherId     String
+  type          SupervisionType
+  date          DateTime
+  notes         String?
+  status        SupervisionStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Relations
+  supervisor    Supervisor       @relation(fields: [supervisorId], references: [id])
+  teacher       Teacher          @relation(fields: [teacherId], references: [id])
+  assessments   Assessment[]
+
+  @@unique([supervisorId, teacherId, date])
+  @@map("supervisions")
+}
+
+model Assessment {
+  id            String   @id @default(uuid())
+  supervisionId String
+  teacherId     String
+  aspectName    String
+  score         Int      @default(1) 
+  feedback      String?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  supervision   Supervision @relation(fields: [supervisionId], references: [id])
+  teacher       Teacher     @relation(fields: [teacherId], references: [id])
+
+  @@unique([supervisionId, aspectName])
+  @@map("assessments")
+}
+
+model Schedule {
+  id            String         @id @default(uuid())
+  supervisorId  String
+  teacherId     String
+  scheduledDate DateTime
+  type          ScheduleType
+  location      String?
+  description   String?
+  status        ScheduleStatus @default(SCHEDULED)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  supervisor    Supervisor     @relation(fields: [supervisorId], references: [id])
+  teacher       Teacher        @relation(fields: [teacherId], references: [id])
+
+  @@unique([supervisorId, teacherId, scheduledDate])
+  @@map("schedules")
+}
+
+model Report {
+  id              String       @id @default(uuid())
+  supervisorId    String
+  teacherId       String
+  title           String
+  content         String
+  period          String
+  averageScore    Float?
+  recommendations String?
+  status          ReportStatus @default(DRAFT)
+  generatedAt     DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  supervisor      Supervisor   @relation(fields: [supervisorId], references: [id])
+
+  @@unique([supervisorId, teacherId, period])
+  @@map("reports")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  entity      String
+  entityId    String?
+  userId      String?
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
