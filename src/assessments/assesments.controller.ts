@@ -21,7 +21,7 @@ import { Role } from '@prisma/client';
 @Controller('assessments')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AssessmentsController {
-  constructor(private readonly assessmentsService: AssessmentsService) { }
+  constructor(private readonly assessmentsService: AssessmentsService) {}
 
   @Post()
   @Roles(Role.SUPERVISOR, Role.ADMIN)
@@ -31,7 +31,9 @@ export class AssessmentsController {
 
   @Post('multiple')
   @Roles(Role.SUPERVISOR, Role.ADMIN)
-  createMultiple(@Body() createMultipleAssessmentsDto: CreateMultipleAssessmentsDto) {
+  createMultiple(
+    @Body() createMultipleAssessmentsDto: CreateMultipleAssessmentsDto,
+  ) {
     return this.assessmentsService.createMultiple(createMultipleAssessmentsDto);
   }
 
